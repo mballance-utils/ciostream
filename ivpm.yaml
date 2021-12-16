@@ -1,0 +1,14 @@
+
+package: 
+  name: pyiostream
+  version: 0.0.1
+
+  deps:
+    - name: cython
+      src: pypi
+
+  dev-deps:
+    - name: cython
+      src: pypi
+
+
