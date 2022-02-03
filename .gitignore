@@ -7,3 +7,5 @@ build/
 dist/
 packages/
 *.so
+src/ciostream/__init__.cpp
+
