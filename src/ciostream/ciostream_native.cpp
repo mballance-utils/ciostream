@@ -15,6 +15,7 @@
  */
 
 #include "ciostream_native.h"
+#include "__init__.h"
 
 namespace ciostream {
 
@@ -53,6 +54,13 @@ std::streambuf::int_type streambuf::underflow() {
     }
 }
 
+int streambuf::overflow(int c) {
+	if (c != EOF) {
+		costream_write(m_stream_obj, c);
+	}
+	return 0;
+}
+
 
 _cistream::_cistream(PyObject *stream) : std::istream(&m_buf), m_buf(stream) {
 
@@ -62,4 +70,13 @@ _cistream::~_cistream() {
 
 }
 
+_costream::_costream(PyObject *stream) : std::ostream(&m_buf), m_buf(stream) {
+
 }
+
+_costream::~_costream() {
+
+}
+
+}
+

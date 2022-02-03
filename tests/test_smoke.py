@@ -23,4 +23,15 @@ class TestSmoke(TestCase):
         print("result: %s" % result)
         
         pass
+    
+    def test_write_smoke(self):
+        data = """
+        Hello, World
+        """
+
+        s = StringIO()        
+        writer = testext.StreamWriterW(s)
+        
+        writer.write(data)
+        print("s.data=%s" % s.getvalue())
         

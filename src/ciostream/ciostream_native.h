@@ -27,6 +27,8 @@ public:
 
     virtual std::streambuf::int_type underflow() override;
 
+    virtual int overflow(int c) override;
+
 private:
         PyObject                *m_stream_obj;
         PyObject                *m_str;
@@ -39,6 +41,17 @@ public:
     _cistream(PyObject *);
 
     virtual ~_cistream();
+
+private:
+    streambuf                 m_buf;
+
+};
+
+class _costream : public std::ostream {
+public:
+    _costream(PyObject *);
+
+    virtual ~_costream();
 
 private:
     streambuf                 m_buf;

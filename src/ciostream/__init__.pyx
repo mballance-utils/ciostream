@@ -34,4 +34,17 @@ cdef class cistream(object):
         
     cdef istream *stream(self):
         return self._hndl
+
+cdef class costream(object):
+
+    def __init__(self, s):
+        self._hndl = new _costream(<cpy_ref.PyObject *>(s))
         
+    def __dealloc__(self):
+        del self._hndl
+
+    cdef ostream *stream(self):
+        return self._hndl
+    
+cdef public void costream_write(obj, int c) with gil:
+    obj.write("%c" % c)

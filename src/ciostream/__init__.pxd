@@ -25,13 +25,23 @@ cimport cpython.ref as cpy_ref
 cdef extern from "<iostream>" namespace "std":
     cdef cppclass istream:
         pass
+    cdef cppclass ostream:
+        pass
 
 cdef extern from 'ciostream_native.h' namespace "ciostream":
     cpdef cppclass _cistream(istream):
         _cistream(cpy_ref.PyObject *)
         
+    cpdef cppclass _costream(ostream):
+        _costream(cpy_ref.PyObject *)
+        
 cdef class cistream(object):
     cdef istream           *_hndl
     cdef istream *stream(self)
+    
+cdef class costream(object):
+    cdef ostream           *_hndl
+    cdef ostream *stream(self)
+
     
 

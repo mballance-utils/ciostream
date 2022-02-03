@@ -7,7 +7,8 @@ ext = Extension(
     "testext",
     sources=[
         "testext/__init__.pyx",
-        "testext/StreamReader.cpp"
+        "testext/StreamReader.cpp",
+        "testext/StreamWriter.cpp"
         ],
     language="c++")
 
