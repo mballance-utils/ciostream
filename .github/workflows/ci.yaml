@@ -19,8 +19,14 @@ jobs:
       - name: Build sdist
         run: |
           python -V
-          python -m pip install Cython
+          python -m pip install twine Cython
           python setup.py sdist
+      - name: Publish to PyPi
+        if: startsWith(github.ref, 'refs/heads/master')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
     linux:
       name: ciostream ${{ matrix.arch }} ${{ matrix.platform }} ${{ matrix.spec }}
@@ -51,6 +57,12 @@ jobs:
           python3 -V 
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
+      - name: Publish to PyPi
+        if: startsWith(github.ref, 'refs/heads/master')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
     macos:
       name: ciostream ${{ matrix.spec }}
@@ -78,6 +90,12 @@ jobs:
           python3 -V
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
+      - name: Publish to PyPi
+        if: startsWith(github.ref, 'refs/heads/master')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
     windows:
       name: ciostream ${{ matrix.platform }} ${{ matrix.python_arch }} ${{ matrix.spec }}
@@ -89,6 +107,18 @@ jobs:
             build_arch: x64
             python_arch: x64
             spec: 3.6
+          - platform: windows-2016
+            build_arch: x64
+            python_arch: x64
+            spec: 3.10
+          - platform: windows-2016
+            build_arch: win32
+            python_arch: x64
+            spec: 3.6
+          - platform: windows-2016
+            build_arch: win32
+            python_arch: x64
+            spec: 3.10
       steps:
       - name: checkout
         uses: actions/checkout@v2
@@ -104,6 +134,12 @@ jobs:
         run: |
           python -V
           python -m pip install Cython wheel
-
           python setup.py build bdist_wheel
+
+      - name: Publish to PyPi
+        if: startsWith(github.ref, 'refs/heads/master')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
