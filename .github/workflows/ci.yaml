@@ -19,7 +19,7 @@ jobs:
       - name: Build sdist
         run: |
           python -V
-          python -m pip install build
+          python -m pip install build Cython
           python -m build .
 
     linux:
