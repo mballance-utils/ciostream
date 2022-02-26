@@ -53,9 +53,9 @@ jobs:
           CIBW_BUILD: ${{ matrix.spec }}-manylinux_${{ matrix.arch }}
           CIBW_BEFORE_BUILD: pip install Cython
           CIBW_BUILD_VERBOSITY: 1
+          CIBW_ENVIRONMENT_PASS_LINUX: BUILD_NUM="$GITHUB_RUN_ID"
         run: |
           set -eux
-          export BUILD_NUM=$GITHUB_RUN_ID
           python3 -V 
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
@@ -85,7 +85,7 @@ jobs:
       - name: Build/Test Package
         env:
           CIBW_BUILD: ${{ matrix.spec }}
-          CIBW_BEFORE_BUILD: pip install Cython
+          CIBW_BEFORE_BUILD: pip install Cython twine
           CIBW_BUILD_VERBOSITY: 1
           MACOX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target || '10.9' }}
           SDKROOT: ${{ matrix.sdkroot || 'macosx' }}
@@ -102,7 +102,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         shell: bash
         run: |
-            python -m twine upload -r ciostream dist/*.whl
+            python -m twine upload dist/*.whl
 
     windows:
       name: ciostream ${{ matrix.platform }} ${{ matrix.python_arch }} ${{ matrix.spec }}
@@ -152,5 +152,5 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         shell: bash
         run: |
-            python -m twine upload -r ciostream dist/*.whl
+            python -m twine upload dist/*.whl
 
