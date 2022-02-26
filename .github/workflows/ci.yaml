@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, edited, reopened]
   workflow_dispatch:
 
-  jobs:
+jobs:
 
     windows:
       name: ciostream ${{ matrix.platform }} ${{ matrix.python_arch }} ${{ matrix.spec }}
