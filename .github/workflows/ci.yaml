@@ -6,6 +6,21 @@ on:
   workflow_dispatch:
 
 jobs:
+    sdist:
+      name: sdist
+      runs-on: ubuntu-latest
+      steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: Install Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Build sdist
+        run: |
+          python -V
+          python -m pip install build
+          python -m build .
 
     linux:
       name: ciostream ${{ matrix.arch }} ${{ matrix.platform }} ${{ matrix.spec }}
@@ -13,7 +28,10 @@ jobs:
       strategy: 
         matrix:
           include:
+          - { platform: manylinux1, arch: x86_64, spec: cp36 }
           - { platform: manylinux1, arch: x86_64, spec: cp37 }
+          - { platform: manylinux1, arch: x86_64, spec: cp38 }
+          - { platform: manylinux1, arch: x86_64, spec: cp39 }
           - { platform: manylinux2014, arch: x86_64, spec: cp310 }
 
       steps:
@@ -31,7 +49,7 @@ jobs:
         run: |
           set -eux
           python3 -V 
-          python3 -m pip install -U --user cibuildwheel Cython
+          python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
 
     macos:
@@ -41,6 +59,10 @@ jobs:
         matrix:
           include:
           - spec: cp36-macosx_x86_64
+          - spec: cp37-macosx_x86_64
+          - spec: cp38-macosx_x86_64
+          - spec: cp39-macosx_x86_64
+          - spec: cp310-macosx_x86_64
       steps:
       - name: checkout
         uses: actions/checkout@v2
@@ -54,7 +76,7 @@ jobs:
           SDKROOT: ${{ matrix.sdkroot || 'macosx' }}
         run: |
           python3 -V
-          python3 -m pip install -U --user cibuildwheel Cython
+          python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
 
     windows:
