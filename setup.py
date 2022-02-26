@@ -5,9 +5,9 @@ from setuptools.extension import Extension
 
 version="0.0.1"
 
-if "BUILD_NUM" in os.environ:
-    version="%s-%s" % (version, os.environ["BUILD_NUM"])
-
+if "GITHUB_RUN_ID" in os.environ:
+    version += "-"
+    version += os.environ["GITHUB_RUN_ID"]
 
 ext = Extension(
     "ciostream",
