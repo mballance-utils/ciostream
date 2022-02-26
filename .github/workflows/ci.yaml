@@ -52,6 +52,7 @@ jobs:
           CIBW_BUILD: ${{ matrix.spec }}-manylinux_${{ matrix.arch }}
           CIBW_BEFORE_BUILD: pip install Cython
           CIBW_BUILD_VERBOSITY: 1
+          CIBW_ENVIRONMENT_PASS_LINUX: GITHUB_RUN_ID
         run: |
           set -eux
           python3 -V 
@@ -99,7 +100,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         shell: bash
         run: |
-            python -m twine upload dist/*.whl
+            python3 -m twine upload dist/*.whl
 
     windows:
       name: ciostream ${{ matrix.platform }} ${{ matrix.python_arch }} ${{ matrix.spec }}
