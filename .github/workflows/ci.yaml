@@ -29,9 +29,9 @@ jobs:
           CIBW_BUILD_VERBOSITY: 1
         run: |
           set -eux
-          python3 -V 
-          python3 -m pip install -U --user cibuildwheel Cython
-          python3 -m cibuildwheel --platform auto --output-dir dist .
+          python -V 
+          python -m pip install -U --user cibuildwheel Cython
+          python -m cibuildwheel --platform auto --output-dir dist .
 
     macos:
       name: ciostream ${{ matrix.spec }}
