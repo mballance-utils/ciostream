@@ -1,7 +1,13 @@
-
+import os
 from setuptools import setup
 from Cython.Build import cythonize
 from setuptools.extension import Extension
+
+version="0.0.1"
+
+if "BUILD_NUM" in os.environ:
+    version="%s-%s" % (version, os.environ["BUILD_NUM"])
+
 
 ext = Extension(
     "ciostream",
@@ -12,7 +18,7 @@ ext = Extension(
 
 setup(
     name="ciostream",
-    version="0.0.1",
+    version=version,
     author="Matthew Ballance",
     author_email="matt.ballance@gmail.com",
     description="Provides C++ iostream Cython wrappers",

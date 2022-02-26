@@ -18,6 +18,7 @@ jobs:
           python-version: 3.x
       - name: Build sdist
         run: |
+          export BUILD_NUM=$GITHUB_RUN_ID
           python -V
           python -m pip install twine Cython
           python setup.py sdist
@@ -54,6 +55,7 @@ jobs:
           CIBW_BUILD_VERBOSITY: 1
         run: |
           set -eux
+          export BUILD_NUM=$GITHUB_RUN_ID
           python3 -V 
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
@@ -87,6 +89,7 @@ jobs:
           MACOX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target || '10.9' }}
           SDKROOT: ${{ matrix.sdkroot || 'macosx' }}
         run: |
+          export BUILD_NUM=$GITHUB_RUN_ID
           python3 -V
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
@@ -113,11 +116,11 @@ jobs:
             spec: 3.10
           - platform: windows-2016
             build_arch: win32
-            python_arch: x64
+            python_arch: x86
             spec: 3.6
           - platform: windows-2016
             build_arch: win32
-            python_arch: x64
+            python_arch: x86
             spec: 3.10
       steps:
       - name: checkout
@@ -132,6 +135,7 @@ jobs:
       - name: Build/Test Package
         shell: bash
         run: |
+          export BUILD_NUM=$GITHUB_RUN_ID
           python -V
           python -m pip install Cython wheel
           python setup.py build bdist_wheel

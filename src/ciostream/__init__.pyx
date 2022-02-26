@@ -24,6 +24,13 @@
 cimport cpython.ref as cpy_ref
 #cimport iostream_decl
 
+class my_cls(object):
+    def __init__(self):
+        import inspect
+        frame = inspect.stack()[1]
+        print("frame: %s" % str(frame))
+        pass
+
 cdef class cistream(object):
 
     def __init__(self, s):

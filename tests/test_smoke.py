@@ -6,6 +6,8 @@ Created on Dec 15, 2021
 from unittest.case import TestCase
 import testext
 from _io import StringIO
+from ciostream import my_cls
+import inspect
 
 class TestSmoke(TestCase):
     
@@ -34,4 +36,10 @@ class TestSmoke(TestCase):
         
         writer.write(data)
         print("s.data=%s" % s.getvalue())
+
+    def test_my_cls(self):
+        c = my_cls()
+        print("file of c: %s" % inspect.getsourcefile(my_cls))
+        pass
+
         
