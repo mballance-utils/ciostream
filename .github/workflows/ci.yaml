@@ -19,8 +19,8 @@ jobs:
       - name: Build sdist
         run: |
           python -V
-          python -m pip install build Cython
-          python -m build .
+          python -m pip install Cython
+          python setup.py sdist
 
     linux:
       name: ciostream ${{ matrix.arch }} ${{ matrix.platform }} ${{ matrix.spec }}
