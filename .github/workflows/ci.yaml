@@ -13,7 +13,7 @@ jobs:
       strategy: 
         matrix:
           include:
-          - { platform: manylinux1, arch: x86_64, spec: cp36 }
+          - { platform: manylinux1, arch: x86_64, spec: cp37 }
           - { platform: manylinux2014, arch: x86_64, spec: cp310 }
 
       steps:
@@ -30,7 +30,7 @@ jobs:
         run: |
           set -eux
           python3 -V 
-          python3 -m pip install -U --user cibuildwheel
+          python3 -m pip install -U --user cibuildwheel Cython
           python3 -m cibuildwheel --platform auto --output-dir dist .
 
     macos:
@@ -52,7 +52,7 @@ jobs:
           SDKROOT: ${{ matrix.sdkroot || 'macosx' }}
         run: |
           python3 -V
-          python3 -m pip install -U --user cibuildwheel
+          python3 -m pip install -U --user cibuildwheel Cython
           python3 -m cibuildwheel --platform auto --output-dir dist .
 
     windows:
