@@ -113,7 +113,7 @@ jobs:
           - platform: windows-2016
             build_arch: x64
             python_arch: x64
-            spec: 3.10
+            spec: '3.10'
           - platform: windows-2016
             build_arch: win32
             python_arch: x86
@@ -121,7 +121,7 @@ jobs:
           - platform: windows-2016
             build_arch: win32
             python_arch: x86
-            spec: 3.10
+            spec: '3.10'
       steps:
       - name: checkout
         uses: actions/checkout@v2
