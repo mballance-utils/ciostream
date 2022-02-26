@@ -59,6 +59,7 @@ jobs:
           python3 -V 
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
+          ls dist
       - name: Publish to PyPi
         if: startsWith(github.ref, 'refs/heads/main')
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -93,12 +94,15 @@ jobs:
           python3 -V
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
+          ls dist
       - name: Publish to PyPi
         if: startsWith(github.ref, 'refs/heads/main')
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        shell: bash
+        run: |
+            python -m twine upload -r ciostream dist/*.whl
 
     windows:
       name: ciostream ${{ matrix.platform }} ${{ matrix.python_arch }} ${{ matrix.spec }}
@@ -137,13 +141,16 @@ jobs:
         run: |
           export BUILD_NUM=$GITHUB_RUN_ID
           python -V
-          python -m pip install Cython wheel
+          python -m pip install Cython wheel twine
           python setup.py build bdist_wheel
+          ls dist
 
       - name: Publish to PyPi
         if: startsWith(github.ref, 'refs/heads/main')
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        shell: bash
+        run: |
+            python -m twine upload -r ciostream dist/*.whl
 
