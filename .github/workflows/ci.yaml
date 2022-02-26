@@ -23,7 +23,7 @@ jobs:
           python -m pip install twine Cython
           python setup.py sdist
       - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/heads/master')
+        if: startsWith(github.ref, 'refs/heads/main')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
@@ -60,7 +60,7 @@ jobs:
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
       - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/heads/master')
+        if: startsWith(github.ref, 'refs/heads/main')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
@@ -94,7 +94,7 @@ jobs:
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform auto --output-dir dist .
       - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/heads/master')
+        if: startsWith(github.ref, 'refs/heads/main')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
@@ -141,7 +141,7 @@ jobs:
           python setup.py build bdist_wheel
 
       - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/heads/master')
+        if: startsWith(github.ref, 'refs/heads/main')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
