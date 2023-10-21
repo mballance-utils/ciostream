@@ -68,26 +68,21 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
     macos:
-      name: ciostream ${{ matrix.spec }}
-      runs-on: ${{ matrix.runs_on || 'macos-10.15' }}
-      strategy:
-        matrix:
-          include:
-          - spec: cp36-macosx_x86_64
-          - spec: cp37-macosx_x86_64
-          - spec: cp38-macosx_x86_64
-          - spec: cp39-macosx_x86_64
-          - spec: cp310-macosx_x86_64
+      runs-on: macos-latest
       steps:
       - name: checkout
         uses: actions/checkout@v2
 
+      - name: Fetch dependencies
+        run: |
+          python3 --version
+          python3 -m pip install cibuildwheel twine
       - name: Build/Test Package
         env:
           CIBW_BUILD: ${{ matrix.spec }}
           CIBW_BEFORE_BUILD: pip install Cython twine
           CIBW_BUILD_VERBOSITY: 1
-          MACOX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target || '10.9' }}
+#          MACOX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target || '10.9' }}
           SDKROOT: ${{ matrix.sdkroot || 'macosx' }}
         run: |
           python3 -V
@@ -109,20 +104,12 @@ jobs:
       strategy:
         matrix:
           include:
-          - platform: windows-2016
-            build_arch: x64
-            python_arch: x64
-            spec: 3.6
-          - platform: windows-2016
+          - platform: windows-latest
             build_arch: x64
             python_arch: x64
             spec: '3.10'
-          - platform: windows-2016
-            build_arch: win32
-            python_arch: x86
-            spec: 3.6
-          - platform: windows-2016
-            build_arch: win32
+          - platform: windows-latest
+            build_arch: x64
             python_arch: x86
             spec: '3.10'
       steps:
