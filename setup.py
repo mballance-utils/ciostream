@@ -28,6 +28,9 @@ setup(
     package_data = {
         'ciostream': ['*.pxd', '*.cpp', '*.h']
     },
-    ext_modules = cythonize([ext])
+    ext_modules = cythonize([ext],
+                    compiler_directives={
+                        'embedsignature': True,
+                        'language_level': '3str'})
 )
 
