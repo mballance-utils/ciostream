@@ -31,8 +31,13 @@ setup(
     packages = ['ciostream'],
     package_dir = {'': 'src'},
     package_data = {
-        'ciostream': ['*.pxd', '*.cpp', '*.h']
+        'ciostream': ['*.pxd', '*.cpp', '*.h', '*.lib']
     },
+    # entry_points={
+    #     "ivpm.pkginfo": [
+    #         'ciostream = ciostream.pkginfo:PkgInfo'
+    #     ]
+    # },
     ext_modules = cythonize([ext],
                     compiler_directives={
                         'embedsignature': True,
