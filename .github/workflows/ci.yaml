@@ -20,7 +20,7 @@ jobs:
       - name: Build sdist
         run: |
           python -V
-          python -m pip install twine Cython
+          python -m pip install twine Cython setuptools
           python setup.py sdist
       - name: Publish to PyPi
         if: startsWith(github.ref, 'refs/heads/main')
