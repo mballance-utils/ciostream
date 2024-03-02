@@ -1,6 +1,5 @@
 import os
 from setuptools import setup
-from Cython.Build import cythonize
 from setuptools.extension import Extension
 
 version="0.0.1"
@@ -38,9 +37,6 @@ setup(
     #         'ciostream = ciostream.pkginfo:PkgInfo'
     #     ]
     # },
-    ext_modules = cythonize([ext],
-                    compiler_directives={
-                        'embedsignature': True,
-                        'language_level': '3str'})
+    ext_modules=[ext]
 )
 
