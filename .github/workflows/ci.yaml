@@ -40,6 +40,8 @@ jobs:
           - { platform: manylinux1, arch: x86_64, spec: cp38 }
           - { platform: manylinux1, arch: x86_64, spec: cp39 }
           - { platform: manylinux2014, arch: x86_64, spec: cp310 }
+          - { platform: manylinux2014, arch: x86_64, spec: cp311 }
+          - { platform: manylinux2014, arch: x86_64, spec: cp312 }
 
       steps:
       - name: checkout
