@@ -9,9 +9,9 @@ if "GITHUB_RUN_ID" in os.environ:
     version += os.environ["GITHUB_RUN_ID"]
 
 ext = Extension(
-    "ciostream",
+    "ciostream.core",
     sources=[
-        "src/ciostream/__init__.pyx",
+        "src/ciostream/core.pyx",
         "src/ciostream/ciostream_native.cpp"],
     language="c++")
 
