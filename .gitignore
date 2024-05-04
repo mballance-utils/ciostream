@@ -7,8 +7,8 @@ build/
 dist/
 packages/
 *.so
-src/ciostream/__init__.cpp
-src/ciostream/__init__.h
+src/ciostream/core.cpp
+src/ciostream/core.h
 tests/testext/__init__.cpp
 tests/testext/__init__.h
 

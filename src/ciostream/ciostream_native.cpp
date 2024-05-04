@@ -15,7 +15,7 @@
  */
 
 #include "ciostream_native.h"
-#include "__init__.h"
+#include "core.h"
 
 namespace ciostream {
 
