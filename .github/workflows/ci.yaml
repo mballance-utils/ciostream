@@ -45,7 +45,7 @@ jobs:
 
       steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
         #      - name: Configure Docker
         #        uses: docker/setup-
@@ -108,17 +108,29 @@ jobs:
           - platform: windows-latest
             build_arch: x64
             python_arch: x64
+            spec: '3.8'
+          - platform: windows-latest
+            build_arch: x64
+            python_arch: x64
+            spec: '3.9'
+          - platform: windows-latest
+            build_arch: x64
+            python_arch: x64
             spec: '3.10'
           - platform: windows-latest
             build_arch: x64
-            python_arch: x86
-            spec: '3.10'
+            python_arch: x64
+            spec: '3.11'
+          - platform: windows-latest
+            build_arch: x64
+            python_arch: x64
+            spec: '3.12'
       steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install python ${{ matrix.spec }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           architecture: ${{ matrix.python_arch }}
           python-version: ${{ matrix.spec }}
