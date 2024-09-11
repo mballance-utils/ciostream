@@ -1,14 +1,17 @@
 
 package: 
-  name: pyiostream
+  name: ciostream
   version: 0.0.1
 
-  deps:
-    - name: cython
-      src: pypi
+  dep-sets:
+    - name: default
+      deps:
+      - name: cython
+        src: pypi
 
-  dev-deps:
-    - name: cython
-      src: pypi
+    - name: default-dev
+      deps:
+      - name: cython
+        src: pypi
 
 
