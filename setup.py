@@ -21,6 +21,7 @@ setup(
     author="Matthew Ballance",
     author_email="matt.ballance@gmail.com",
     description="Provides C++ iostream Cython wrappers",
+    setup_requires=["cython"],
     long_description="""
     Provides a Cython wrapper around C++ iostream classes. 
     This allows users to easily wrap a Python IO stream 
