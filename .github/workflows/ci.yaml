@@ -12,9 +12,9 @@ jobs:
       runs-on: ubuntu-latest
       steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: 3.x
       - name: Build sdist
@@ -30,37 +30,48 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
     linux:
-      name: ciostream ${{ matrix.arch }} ${{ matrix.platform }} ${{ matrix.spec }}
+      name: ciostream ${{ matrix.arch }} manylinux2014 ${{ matrix.spec }}
       runs-on: ubuntu-latest
-      strategy: 
+      strategy:
         matrix:
           include:
-          - { platform: manylinux1, arch: x86_64, spec: cp36 }
-          - { platform: manylinux1, arch: x86_64, spec: cp37 }
-          - { platform: manylinux1, arch: x86_64, spec: cp38 }
-          - { platform: manylinux1, arch: x86_64, spec: cp39 }
-          - { platform: manylinux2014, arch: x86_64, spec: cp310 }
-          - { platform: manylinux2014, arch: x86_64, spec: cp311 }
-          - { platform: manylinux2014, arch: x86_64, spec: cp312 }
+          # x86_64
+          - { arch: x86_64, spec: cp38 }
+          - { arch: x86_64, spec: cp39 }
+          - { arch: x86_64, spec: cp310 }
+          - { arch: x86_64, spec: cp311 }
+          - { arch: x86_64, spec: cp312 }
+          - { arch: x86_64, spec: cp313 }
+          # aarch64
+          - { arch: aarch64, spec: cp38 }
+          - { arch: aarch64, spec: cp39 }
+          - { arch: aarch64, spec: cp310 }
+          - { arch: aarch64, spec: cp311 }
+          - { arch: aarch64, spec: cp312 }
+          - { arch: aarch64, spec: cp313 }
 
       steps:
       - name: checkout
         uses: actions/checkout@v4
 
-        #      - name: Configure Docker
-        #        uses: docker/setup-
+      - name: Set up QEMU
+        if: matrix.arch == 'aarch64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Build/Test Package
         env:
-          CIBW_ARCHS: all
+          CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_BUILD: ${{ matrix.spec }}-manylinux_${{ matrix.arch }}
           CIBW_BEFORE_BUILD: pip install Cython
           CIBW_BUILD_VERBOSITY: 1
           CIBW_ENVIRONMENT_PASS_LINUX: GITHUB_RUN_ID
         run: |
           set -eux
-          python3 -V 
+          python3 -V
           python3 -m pip install -U --user cibuildwheel
-          python3 -m cibuildwheel --platform auto --output-dir dist .
+          python3 -m cibuildwheel --platform linux --output-dir dist .
           ls dist
       - name: Publish to PyPi
         if: startsWith(github.ref, 'refs/heads/main')
@@ -70,35 +81,49 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
     macos:
-      runs-on: macos-latest
+      name: ciostream ${{ matrix.arch }} ${{ matrix.spec }}
+      runs-on: ${{ matrix.runner }}
+      strategy:
+        matrix:
+          include:
+          # x86_64 (Intel) — macos-13 is the last x86_64 runner
+          - { runner: macos-13,     arch: x86_64, spec: cp38 }
+          - { runner: macos-13,     arch: x86_64, spec: cp39 }
+          - { runner: macos-13,     arch: x86_64, spec: cp310 }
+          - { runner: macos-13,     arch: x86_64, spec: cp311 }
+          - { runner: macos-13,     arch: x86_64, spec: cp312 }
+          - { runner: macos-13,     arch: x86_64, spec: cp313 }
+          # arm64 (Apple Silicon) — macos-latest is arm64
+          - { runner: macos-latest, arch: arm64,  spec: cp38 }
+          - { runner: macos-latest, arch: arm64,  spec: cp39 }
+          - { runner: macos-latest, arch: arm64,  spec: cp310 }
+          - { runner: macos-latest, arch: arm64,  spec: cp311 }
+          - { runner: macos-latest, arch: arm64,  spec: cp312 }
+          - { runner: macos-latest, arch: arm64,  spec: cp313 }
+
       steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Fetch dependencies
-        run: |
-          python3 --version
-          python3 -m venv py
-          ./py/bin/python3 -m pip install cython setuptools wheel build twine
       - name: Build/Test Package
         env:
-#          CIBW_BUILD: ${{ matrix.spec }}
-#          CIBW_BEFORE_BUILD: pip install Cython twine
-#          CIBW_BUILD_VERBOSITY: 1
-#          MACOX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target || '10.9' }}
-          SDKROOT: ${{ matrix.sdkroot || 'macosx' }}
+          CIBW_ARCHS: ${{ matrix.arch }}
+          CIBW_BUILD: ${{ matrix.spec }}-macosx_${{ matrix.arch }}
+          CIBW_BEFORE_BUILD: pip install Cython
+          CIBW_BUILD_VERBOSITY: 1
         run: |
-          ./py/bin/python3 -V
-          ./py/bin/python3 setup.py bdist_wheel
+          python3 -V
+          python3 -m pip install -U cibuildwheel
+          python3 -m cibuildwheel --platform macos --output-dir dist .
           ls dist
       - name: Publish to PyPi
         if: startsWith(github.ref, 'refs/heads/main')
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        shell: bash
         run: |
-            ./py/bin/python3 -m twine upload dist/*.whl
+          python3 -m pip install twine
+          python3 -m twine upload dist/*.whl
 
     windows:
       name: ciostream ${{ matrix.platform }} ${{ matrix.python_arch }} ${{ matrix.spec }}
@@ -126,12 +151,16 @@ jobs:
             build_arch: x64
             python_arch: x64
             spec: '3.12'
+          - platform: windows-latest
+            build_arch: x64
+            python_arch: x64
+            spec: '3.13'
       steps:
       - name: checkout
         uses: actions/checkout@v4
 
       - name: Install python ${{ matrix.spec }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           architecture: ${{ matrix.python_arch }}
           python-version: ${{ matrix.spec }}
