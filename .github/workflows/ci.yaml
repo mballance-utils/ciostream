@@ -84,6 +84,7 @@ jobs:
       name: ciostream ${{ matrix.arch }} ${{ matrix.spec }}
       runs-on: ${{ matrix.runner }}
       strategy:
+        fail-fast: false
         matrix:
           include:
           # x86_64 (Intel) — macos-13 is the last x86_64 runner
