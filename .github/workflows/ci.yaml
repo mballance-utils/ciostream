@@ -87,13 +87,13 @@ jobs:
         fail-fast: false
         matrix:
           include:
-          # x86_64 (Intel) — macos-13 is the last x86_64 runner
-          - { runner: macos-13,     arch: x86_64, spec: cp38 }
-          - { runner: macos-13,     arch: x86_64, spec: cp39 }
-          - { runner: macos-13,     arch: x86_64, spec: cp310 }
-          - { runner: macos-13,     arch: x86_64, spec: cp311 }
-          - { runner: macos-13,     arch: x86_64, spec: cp312 }
-          - { runner: macos-13,     arch: x86_64, spec: cp313 }
+          # x86_64 (Intel) — cross-compiled on arm64 runner via cibuildwheel
+          - { runner: macos-latest, arch: x86_64, spec: cp38 }
+          - { runner: macos-latest, arch: x86_64, spec: cp39 }
+          - { runner: macos-latest, arch: x86_64, spec: cp310 }
+          - { runner: macos-latest, arch: x86_64, spec: cp311 }
+          - { runner: macos-latest, arch: x86_64, spec: cp312 }
+          - { runner: macos-latest, arch: x86_64, spec: cp313 }
           # arm64 (Apple Silicon) — macos-latest is arm64
           - { runner: macos-latest, arch: arm64,  spec: cp38 }
           - { runner: macos-latest, arch: arm64,  spec: cp39 }
