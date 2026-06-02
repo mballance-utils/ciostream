@@ -42,6 +42,7 @@ jobs:
           - { arch: x86_64, spec: cp311 }
           - { arch: x86_64, spec: cp312 }
           - { arch: x86_64, spec: cp313 }
+          - { arch: x86_64, spec: cp314 }
           # aarch64
           - { arch: aarch64, spec: cp38 }
           - { arch: aarch64, spec: cp39 }
@@ -49,6 +50,7 @@ jobs:
           - { arch: aarch64, spec: cp311 }
           - { arch: aarch64, spec: cp312 }
           - { arch: aarch64, spec: cp313 }
+          - { arch: aarch64, spec: cp314 }
 
       steps:
       - name: checkout
@@ -94,6 +96,7 @@ jobs:
           - { runner: macos-latest, arch: x86_64, spec: cp311 }
           - { runner: macos-latest, arch: x86_64, spec: cp312 }
           - { runner: macos-latest, arch: x86_64, spec: cp313 }
+          - { runner: macos-latest, arch: x86_64, spec: cp314 }
           # arm64 (Apple Silicon) — macos-latest is arm64
           - { runner: macos-latest, arch: arm64,  spec: cp38 }
           - { runner: macos-latest, arch: arm64,  spec: cp39 }
@@ -101,6 +104,7 @@ jobs:
           - { runner: macos-latest, arch: arm64,  spec: cp311 }
           - { runner: macos-latest, arch: arm64,  spec: cp312 }
           - { runner: macos-latest, arch: arm64,  spec: cp313 }
+          - { runner: macos-latest, arch: arm64,  spec: cp314 }
 
       steps:
       - name: checkout
@@ -154,6 +158,10 @@ jobs:
             build_arch: x64
             python_arch: x64
             spec: '3.13'
+          - platform: windows-latest
+            build_arch: x64
+            python_arch: x64
+            spec: '3.14'
       steps:
       - name: checkout
         uses: actions/checkout@v4

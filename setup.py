@@ -28,6 +28,16 @@ setup(
     and pass it to a native library that uses C++ iostreams.
     """,
     zip_safe=False,
+    python_requires=">=3.8",
+    classifiers=[
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
+    ],
     packages = ['ciostream'],
     package_dir = {'': 'src'},
     package_data = {
