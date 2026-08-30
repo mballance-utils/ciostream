@@ -7,7 +7,48 @@ on:
 
 
 jobs:
+    gate:
+      # Release master switch. ONE file, above both platforms, decides who
+      # releases this repo:
+      #   https://dvkit.org/.well-known/release-authority.json
+      # Generated from sync-policy.toml by `git-sync emit-release-authority`, so
+      # GitHub and Forgejo cannot drift -- there is only one copy for them to
+      # disagree about. The runner only READS it, over plain HTTPS with no
+      # credential: a workflow file is public and editable by anyone who can push.
+      #
+      # `if:` on a job cannot reference a step in its own job, so the switch is
+      # resolved here and consumed through needs.gate.outputs.authority.
+      name: Release authority
+      runs-on: ubuntu-latest
+      outputs:
+        authority: ${{ steps.resolve.outputs.authority }}
+      steps:
+        - id: resolve
+          # One line on purpose: a multi-line `python3 -c` has to start at column
+          # 0, which terminates the YAML block scalar and silently corrupts the
+          # workflow.
+          run: |
+            url=https://dvkit.org/.well-known/release-authority.json
+            if ! body=$(curl -fsS --max-time 10 "$url"); then
+              # DECIDED 2026-08-30: fail CLOSED on a tag. A release blocked by a
+              # dvkit.org outage is recoverable; a release published twice from
+              # two forges is not. Quiet on a non-tag ref -- nothing was due.
+              case "$GITHUB_REF" in
+                refs/tags/v*)
+                  echo "::error::release-authority switch unreachable; refusing to publish"
+                  exit 1 ;;
+                *)
+                  echo "authority=none" >> "$GITHUB_OUTPUT"
+                  echo "switch unreachable on a non-tag ref; nothing to release"
+                  exit 0 ;;
+              esac
+            fi
+            auth=$(printf '%s' "$body" | python3 -c 'import json,os,sys; d=json.load(sys.stdin); r=os.environ["GITHUB_REPOSITORY"]; print(d["repos"].get(r) or d["orgs"].get(r.split("/")[0]) or d["default"])')
+            echo "release authority for $GITHUB_REPOSITORY: $auth"
+            echo "authority=$auth" >> "$GITHUB_OUTPUT"
+
     sdist:
+      needs: [gate]
       name: sdist
       runs-on: ubuntu-latest
       steps:
@@ -23,13 +64,14 @@ jobs:
           python -m pip install twine Cython setuptools
           python setup.py sdist
       - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/heads/main')
+        if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
 
     linux:
+      needs: [gate]
       name: ciostream ${{ matrix.arch }} manylinux2014 ${{ matrix.spec }}
       runs-on: ubuntu-latest
       strategy:
@@ -74,13 +116,14 @@ jobs:
           python3 -m cibuildwheel --platform linux --output-dir dist .
           ls dist
       - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/heads/main')
+        if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
 
     macos:
+      needs: [gate]
       name: ciostream ${{ matrix.arch }} ${{ matrix.spec }}
       runs-on: ${{ matrix.runner }}
       strategy:
@@ -117,7 +160,7 @@ jobs:
           pipx run cibuildwheel --platform macos --output-dir dist .
           ls dist
       - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/heads/main')
+        if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
@@ -125,6 +168,7 @@ jobs:
           pipx run twine upload dist/*.whl
 
     windows:
+      needs: [gate]
       name: ciostream ${{ matrix.platform }} ${{ matrix.python_arch }} ${{ matrix.spec }}
       runs-on: ${{ matrix.platform }}
       strategy:
@@ -173,7 +217,7 @@ jobs:
           ls dist
 
       - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/heads/main')
+        if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
