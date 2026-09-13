@@ -12,3 +12,9 @@ src/ciostream/core.h
 tests/testext/__init__.cpp
 tests/testext/__init__.h
 
+# A 375 KB x86-64 ELF shared object was committed here as "core.py" (commit
+# e208416, "XX"). The `*.so` rule above did not catch it because of the
+# extension, and `packages=['ciostream']` then copied it into EVERY wheel --
+# including macOS, Windows and aarch64 ones. It is listed by name so the same
+# build artifact cannot be committed again.
+src/ciostream/core.py

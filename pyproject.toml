@@ -1,0 +1,21 @@
+# Build-system declaration. NOT a migration of the packaging metadata -- name,
+# version and everything else stay in setup.py, because the release job's tag
+# check and the Forgejo static check both grep setup.py for
+#     ^version="..."$
+# and moving it here would silently break both.
+#
+# This file exists for one reason: setup.py used to declare
+#     setup_requires=["cython"]
+# which is resolved by easy_install. setuptools removed easy_install, so on a
+# modern interpreter that line fetches nothing and the build fails at
+# `from Cython.Build import cythonize`. Under PEP 517 the requirements below are
+# installed into the isolated build env instead, which is what both cibuildwheel
+# and `python -m build` use.
+[build-system]
+requires = [
+    "setuptools>=64",
+    "wheel",
+    # Cython 3.1+ is the first series with CPython 3.14 support.
+    "cython>=3.1",
+]
+build-backend = "setuptools.build_meta"
