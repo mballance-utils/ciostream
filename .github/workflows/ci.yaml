@@ -1,227 +1,402 @@
+# mballance-utils/ciostream -- GitHub Actions.
+#
+# COPY THIS AS A PAIR. Its counterpart is .forgejo/workflows/ci.yml. If
+# .forgejo/workflows/ is absent the Forgejo runner falls back to running THIS
+# FILE, under a runner that cannot build these wheels and was never set up to
+# publish them. Read that file before changing the shape of this one.
+#
+# Release authority for this repo is `github` -- see the gate job below. The
+# Forgejo side deliberately has no publish job.
+#
+# SHAPE: build -> artifact -> ONE publish job. Every platform leg uploads its
+# wheels and publishes nothing; a single `publish` job gathers them and makes
+# one upload. That is not tidiness. With a publish step inside each leg -- which
+# is what this file had until this commit -- a release where the Windows 3.12
+# leg fails after the Linux legs have uploaded leaves a HALF-PUBLISHED version
+# on PyPI, and a PyPI filename can be yanked but never reused, so there is no
+# way to complete it. Gating one upload on every build job makes the release
+# all-or-nothing.
+
+name: CI
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
-    types: [opened, synchronize, edited, reopened]
   workflow_dispatch:
 
+# THE INTERPRETER FLOOR IS 3.10, raised from 3.8 -- every `spec:` list below
+# starts there. cibuildwheel 4.x carries no cp38 configuration at all, so the
+# cp38 legs this file used to declare could never have produced a wheel; 3.9
+# reached end-of-life in October 2025. python_requires in setup.py says the
+# same thing, and the two have to agree: if the matrix builds an interpreter
+# python_requires excludes, pip installs a wheel the project does not claim to
+# support.
+env:
+  CIBW_BUILD_VERBOSITY: 1
+  # Passed INTO the manylinux container. Without this the stamp computed on the
+  # host is invisible to setup.py running inside it, and every Linux wheel is
+  # built as the clean release version.
+  CIBW_ENVIRONMENT_PASS_LINUX: BUILD_NUM
 
 jobs:
-    gate:
-      # Release master switch. ONE file, above both platforms, decides who
-      # releases this repo:
-      #   https://dvkit.org/.well-known/release-authority.json
-      # Generated from sync-policy.toml by `git-sync emit-release-authority`, so
-      # GitHub and Forgejo cannot drift -- there is only one copy for them to
-      # disagree about. The runner only READS it, over plain HTTPS with no
-      # credential: a workflow file is public and editable by anyone who can push.
-      #
-      # `if:` on a job cannot reference a step in its own job, so the switch is
-      # resolved here and consumed through needs.gate.outputs.authority.
-      name: Release authority
-      runs-on: ubuntu-latest
-      outputs:
-        authority: ${{ steps.resolve.outputs.authority }}
-      steps:
-        - id: resolve
-          # One line on purpose: a multi-line `python3 -c` has to start at column
-          # 0, which terminates the YAML block scalar and silently corrupts the
-          # workflow.
-          run: |
-            url=https://dvkit.org/.well-known/release-authority.json
-            if ! body=$(curl -fsS --max-time 10 "$url"); then
-              # DECIDED 2026-08-30: fail CLOSED on a tag. A release blocked by a
-              # dvkit.org outage is recoverable; a release published twice from
-              # two forges is not. Quiet on a non-tag ref -- nothing was due.
-              case "$GITHUB_REF" in
-                refs/tags/v*)
-                  echo "::error::release-authority switch unreachable; refusing to publish"
-                  exit 1 ;;
-                *)
-                  echo "authority=none" >> "$GITHUB_OUTPUT"
-                  echo "switch unreachable on a non-tag ref; nothing to release"
-                  exit 0 ;;
-              esac
-            fi
-            auth=$(printf '%s' "$body" | python3 -c 'import json,os,sys; d=json.load(sys.stdin); r=os.environ["GITHUB_REPOSITORY"]; print(d["repos"].get(r) or d["orgs"].get(r.split("/")[0]) or d["default"])')
-            echo "release authority for $GITHUB_REPOSITORY: $auth"
-            echo "authority=$auth" >> "$GITHUB_OUTPUT"
+  # ---------------------------------------------------------------- gate ----
+  gate:
+    # Release master switch. ONE file, above both platforms, decides who
+    # releases this repo:
+    #   https://dvkit.org/.well-known/release-authority.json
+    # Generated from sync-policy.toml by `git-sync emit-release-authority`, so
+    # GitHub and Forgejo cannot drift -- there is only one copy for them to
+    # disagree about. The runner only READS it, over plain HTTPS with no
+    # credential: a workflow file is public and editable by anyone who can push.
+    #
+    # `if:` on a job cannot reference a step in its own job, so the switch is
+    # resolved here and consumed through needs.gate.outputs.authority.
+    name: Release authority
+    runs-on: ubuntu-latest
+    outputs:
+      authority: ${{ steps.resolve.outputs.authority }}
+    steps:
+      - id: resolve
+        # One line on purpose: a multi-line `python3 -c` has to start at column
+        # 0, which terminates the YAML block scalar and silently corrupts the
+        # workflow.
+        run: |
+          url=https://dvkit.org/.well-known/release-authority.json
+          if ! body=$(curl -fsS --max-time 10 "$url"); then
+            # DECIDED 2026-08-30: fail CLOSED on a tag. A release blocked by a
+            # dvkit.org outage is recoverable; a release published twice from
+            # two forges is not. Quiet on a non-tag ref -- nothing was due.
+            case "$GITHUB_REF" in
+              refs/tags/v*)
+                echo "::error::release-authority switch unreachable; refusing to publish"
+                exit 1 ;;
+              *)
+                echo "authority=none" >> "$GITHUB_OUTPUT"
+                echo "switch unreachable on a non-tag ref; nothing to release"
+                exit 0 ;;
+            esac
+          fi
+          auth=$(printf '%s' "$body" | python3 -c 'import json,os,sys; d=json.load(sys.stdin); r=os.environ["GITHUB_REPOSITORY"]; print(d["repos"].get(r) or d["orgs"].get(r.split("/")[0]) or d["default"])')
+          echo "release authority for $GITHUB_REPOSITORY: $auth"
+          echo "authority=$auth" >> "$GITHUB_OUTPUT"
 
-    sdist:
-      needs: [gate]
-      name: sdist
-      runs-on: ubuntu-latest
-      steps:
-      - name: checkout
-        uses: actions/checkout@v4
-      - name: Install Python
-        uses: actions/setup-python@v5
+  # ------------------------------------------------------------ tagcheck ----
+  tagcheck:
+    # Cheap, and it runs before the 40-odd build jobs, so a mistyped tag costs
+    # seconds rather than most of an hour.
+    #
+    # REQUIRED, not optional. The tag alone determines the published version, so
+    # this is what stops v0.1.0 being tagged while setup.py still says 0.0.1 --
+    # which would publish under the wrong number, unfixably, because a PyPI
+    # version can be yanked but never reused. The publish job asserts the other
+    # half of the same property: that the built artifacts agree with the source
+    # they claim to come from.
+    name: Tag matches source version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the tag IS the version
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) ;;
+            *) echo "not a tag -- nothing to check"; exit 0 ;;
+          esac
+          tag="${GITHUB_REF#refs/tags/v}"
+          base=$(sed -n 's/^version="\(.*\)"$/\1/p' setup.py | head -1)
+          echo "tag=$tag  source=$base"
+          if [ -z "$base" ]; then
+            echo "::error::no top-level version=\"...\" in setup.py to check the tag against"
+            exit 1
+          fi
+          if [ "$tag" != "$base" ]; then
+            echo "::error::tag v$tag does not match version $base in setup.py"
+            exit 1
+          fi
+          echo "OK: tag and source version agree on $base"
+
+  # ---------------------------------------------------------------- sdist ---
+  sdist:
+    needs: [gate, tagcheck]
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
         with:
-          python-version: 3.x
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Compute the build stamp
+        id: stamp
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              echo "tag build -- leaving the version clean"
+              echo "build_num=" >> "$GITHUB_OUTPUT" ;;
+            *)
+              stamp="dev${GITHUB_RUN_ID}+gh.g$(git rev-parse --short=7 HEAD)"
+              echo "stamping .$stamp"
+              echo "build_num=$stamp" >> "$GITHUB_OUTPUT" ;;
+          esac
       - name: Build sdist
+        env:
+          BUILD_NUM: ${{ steps.stamp.outputs.build_num }}
         run: |
           python -V
-          python -m pip install twine Cython setuptools
-          python setup.py sdist
-      - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
-        uses: pypa/gh-action-pypi-publish@release/v1
+          python -m pip install -U build twine
+          python -m build --sdist
+          python -m twine check dist/*.tar.gz
+          ls -la dist
+      - uses: actions/upload-artifact@v4
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          name: dist-sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
 
-    linux:
-      needs: [gate]
-      name: ciostream ${{ matrix.arch }} manylinux2014 ${{ matrix.spec }}
-      runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          include:
-          # x86_64
-          - { arch: x86_64, spec: cp38 }
-          - { arch: x86_64, spec: cp39 }
-          - { arch: x86_64, spec: cp310 }
-          - { arch: x86_64, spec: cp311 }
-          - { arch: x86_64, spec: cp312 }
-          - { arch: x86_64, spec: cp313 }
-          # aarch64
-          - { arch: aarch64, spec: cp38 }
-          - { arch: aarch64, spec: cp39 }
-          - { arch: aarch64, spec: cp310 }
-          - { arch: aarch64, spec: cp311 }
-          - { arch: aarch64, spec: cp312 }
-          - { arch: aarch64, spec: cp313 }
-
-      steps:
-      - name: checkout
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        if: matrix.arch == 'aarch64'
-        uses: docker/setup-qemu-action@v3
+  # ---------------------------------------------------------------- linux ---
+  linux:
+    needs: [gate, tagcheck]
+    name: linux ${{ matrix.arch }} ${{ matrix.image }} ${{ matrix.spec }}
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      # One interpreter's failure must not cancel the other twenty-nine --
+      # otherwise a single broken leg reads as "everything is broken" and the
+      # real blast radius is invisible.
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+        # THREE glibc levels, not one. This repo shipped only manylinux2014
+        # (glibc 2.17) wheels. That is the most portable tag and it does install
+        # everywhere, but pip prefers the most specific compatible tag, so a
+        # modern distro gets a wheel built against a 2014-era toolchain when a
+        # better one could exist. Building all three lets each consumer resolve
+        # to the newest one their glibc supports and keeps the 2.17 floor for
+        # everyone else. The three produce distinct filenames
+        # (manylinux_2_17 / _2_28 / _2_34), so they coexist on PyPI.
+        image: [manylinux2014, manylinux_2_28, manylinux_2_34]
+        spec: [cp310, cp311, cp312, cp313, cp314]
+    steps:
+      - uses: actions/checkout@v5
         with:
-          platforms: arm64
+          fetch-depth: 0
 
-      - name: Build/Test Package
+      # No QEMU. aarch64 was cross-emulated on an x86_64 runner, which made
+      # those legs roughly an order of magnitude slower than the native ones and
+      # was the usual reason a run timed out. GitHub's ubuntu-24.04-arm runners
+      # build these natively.
+
+      - name: Compute the build stamp
+        id: stamp
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              echo "tag build -- leaving the version clean"
+              echo "build_num=" >> "$GITHUB_OUTPUT" ;;
+            *)
+              stamp="dev${GITHUB_RUN_ID}+gh.g$(git rev-parse --short=7 HEAD)"
+              echo "stamping .$stamp"
+              echo "build_num=$stamp" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Build wheel
         env:
+          BUILD_NUM: ${{ steps.stamp.outputs.build_num }}
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_BUILD: ${{ matrix.spec }}-manylinux_${{ matrix.arch }}
-          CIBW_BEFORE_BUILD: pip install Cython
-          CIBW_BUILD_VERBOSITY: 1
-          CIBW_ENVIRONMENT_PASS_LINUX: GITHUB_RUN_ID
+          CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.image }}
+          CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.image }}
+          # Loading the extension is the whole point of the test: it is what
+          # catches a wheel that compiled but cannot resolve libstdc++ at
+          # import time. The repo's tests/ suite is not usable here -- it
+          # imports `my_cls` from ciostream, which does not exist, and needs a
+          # second C++ extension built out of tests/.
+          CIBW_TEST_COMMAND: python -c "import ciostream.core as c; print('import OK:', c.__file__)"
         run: |
           set -eux
           python3 -V
           python3 -m pip install -U --user cibuildwheel
           python3 -m cibuildwheel --platform linux --output-dir dist .
-          ls dist
-      - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
-        uses: pypa/gh-action-pypi-publish@release/v1
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          name: dist-linux-${{ matrix.arch }}-${{ matrix.image }}-${{ matrix.spec }}
+          path: dist/*.whl
+          if-no-files-found: error
 
-    macos:
-      needs: [gate]
-      name: ciostream ${{ matrix.arch }} ${{ matrix.spec }}
-      runs-on: ${{ matrix.runner }}
-      strategy:
-        fail-fast: false
-        matrix:
-          include:
-          # x86_64 (Intel) — cross-compiled on arm64 runner via cibuildwheel
-          - { runner: macos-latest, arch: x86_64, spec: cp38 }
-          - { runner: macos-latest, arch: x86_64, spec: cp39 }
-          - { runner: macos-latest, arch: x86_64, spec: cp310 }
-          - { runner: macos-latest, arch: x86_64, spec: cp311 }
-          - { runner: macos-latest, arch: x86_64, spec: cp312 }
-          - { runner: macos-latest, arch: x86_64, spec: cp313 }
-          # arm64 (Apple Silicon) — macos-latest is arm64
-          - { runner: macos-latest, arch: arm64,  spec: cp38 }
-          - { runner: macos-latest, arch: arm64,  spec: cp39 }
-          - { runner: macos-latest, arch: arm64,  spec: cp310 }
-          - { runner: macos-latest, arch: arm64,  spec: cp311 }
-          - { runner: macos-latest, arch: arm64,  spec: cp312 }
-          - { runner: macos-latest, arch: arm64,  spec: cp313 }
+  # ---------------------------------------------------------------- macos ---
+  macos:
+    needs: [gate, tagcheck]
+    name: macos ${{ matrix.arch }} ${{ matrix.spec }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest is arm64. The x86_64 wheels are cross-compiled on it;
+        # cibuildwheel detects the cross-build and skips the test step for those
+        # legs rather than failing on a binary it cannot run.
+        arch: [x86_64, arm64]
+        spec: [cp310, cp311, cp312, cp313, cp314]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
-      steps:
-      - name: checkout
-        uses: actions/checkout@v4
+      - name: Compute the build stamp
+        id: stamp
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              echo "tag build -- leaving the version clean"
+              echo "build_num=" >> "$GITHUB_OUTPUT" ;;
+            *)
+              stamp="dev${GITHUB_RUN_ID}+gh.g$(git rev-parse --short=7 HEAD)"
+              echo "stamping .$stamp"
+              echo "build_num=$stamp" >> "$GITHUB_OUTPUT" ;;
+          esac
 
-      - name: Build/Test Package
+      - name: Build wheel
         env:
+          BUILD_NUM: ${{ steps.stamp.outputs.build_num }}
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_BUILD: ${{ matrix.spec }}-macosx_${{ matrix.arch }}
-          CIBW_BEFORE_BUILD: pip install Cython
-          CIBW_BUILD_VERBOSITY: 1
+          CIBW_TEST_COMMAND: python -c "import ciostream.core as c; print('import OK:', c.__file__)"
         run: |
+          set -eux
           python3 -V
           pipx run cibuildwheel --platform macos --output-dir dist .
-          ls dist
-      - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          pipx run twine upload dist/*.whl
+          ls -la dist
 
-    windows:
-      needs: [gate]
-      name: ciostream ${{ matrix.platform }} ${{ matrix.python_arch }} ${{ matrix.spec }}
-      runs-on: ${{ matrix.platform }}
-      strategy:
-        matrix:
-          include:
-          - platform: windows-latest
-            build_arch: x64
-            python_arch: x64
-            spec: '3.8'
-          - platform: windows-latest
-            build_arch: x64
-            python_arch: x64
-            spec: '3.9'
-          - platform: windows-latest
-            build_arch: x64
-            python_arch: x64
-            spec: '3.10'
-          - platform: windows-latest
-            build_arch: x64
-            python_arch: x64
-            spec: '3.11'
-          - platform: windows-latest
-            build_arch: x64
-            python_arch: x64
-            spec: '3.12'
-          - platform: windows-latest
-            build_arch: x64
-            python_arch: x64
-            spec: '3.13'
-      steps:
-      - name: checkout
-        uses: actions/checkout@v4
-
-      - name: Install python ${{ matrix.spec }}
-        uses: actions/setup-python@v5
+      - uses: actions/upload-artifact@v4
         with:
-          architecture: ${{ matrix.python_arch }}
-          python-version: ${{ matrix.spec }}
+          name: dist-macos-${{ matrix.arch }}-${{ matrix.spec }}
+          path: dist/*.whl
+          if-no-files-found: error
 
-      - name: Build/Test Package
+  # -------------------------------------------------------------- windows ---
+  windows:
+    needs: [gate, tagcheck]
+    name: windows x64 ${{ matrix.spec }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        spec: [cp310, cp311, cp312, cp313, cp314]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Compute the build stamp
+        id: stamp
+        # bash rather than PowerShell, so the stamping logic is the one line of
+        # shell it is in every other leg rather than a second dialect of it.
         shell: bash
         run: |
-          python -V
-          python -m pip install Cython wheel twine setuptools
-          python setup.py build bdist_wheel
-          ls dist
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              echo "tag build -- leaving the version clean"
+              echo "build_num=" >> "$GITHUB_OUTPUT" ;;
+            *)
+              stamp="dev${GITHUB_RUN_ID}+gh.g$(git rev-parse --short=7 HEAD)"
+              echo "stamping .$stamp"
+              echo "build_num=$stamp" >> "$GITHUB_OUTPUT" ;;
+          esac
 
-      - name: Publish to PyPi
-        if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Build wheel
+        # cibuildwheel here too, rather than the bare `setup.py bdist_wheel`
+        # this leg used to run. That path built against whatever interpreter the
+        # job happened to have and produced no MSVC runtime check; cibuildwheel
+        # fetches the matrix interpreter itself and runs the import test against
+        # the finished wheel, so the three platforms now agree on what "built"
+        # means.
+        shell: bash
+        env:
+          BUILD_NUM: ${{ steps.stamp.outputs.build_num }}
+          CIBW_ARCHS: AMD64
+          CIBW_BUILD: ${{ matrix.spec }}-win_amd64
+          CIBW_TEST_COMMAND: python -c "import ciostream.core as c; print('import OK:', c.__file__)"
+        run: |
+          set -eux
+          python -V
+          python -m pip install -U cibuildwheel
+          python -m cibuildwheel --platform windows --output-dir dist .
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows-${{ matrix.spec }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  # -------------------------------------------------------------- publish ---
+  publish:
+    name: Publish to PyPI
+    # Three conditions, and all of them matter:
+    #   * a TAG -- a push to a branch never releases anything. This is what
+    #     makes the 5-minute Forgejo sync safe: mirroring your work cannot ship
+    #     it.
+    #   * the switch names THIS forge.
+    #   * every build job succeeded -- `needs:` supplies this one. A partial
+    #     matrix must not become a partial release.
+    #
+    # SKIPS -- does not fail -- when the switch names the other side. A red
+    # build on the dormant side every time anyone tags would train people to
+    # ignore the signal, which is worse than no signal.
+    if: startsWith(github.ref, 'refs/tags/v') && needs.gate.outputs.authority == 'github'
+    needs: [gate, tagcheck, sdist, linux, macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      - name: Check every artifact IS the tagged version
+        # The other half of the tagcheck job: that job proved the SOURCE agrees
+        # with the tag, this one proves the BUILT ARTIFACTS agree with the
+        # source. A leg that somehow built from a stale version file passes the
+        # first and fails here.
+        run: |
+          base="${GITHUB_REF#refs/tags/v}"
+          ls -la dist/
+          n=0
+          for f in dist/*; do
+            case "$(basename "$f")" in
+              ciostream-${base}-*.whl|ciostream-${base}.tar.gz) n=$((n+1)) ;;
+              *) echo "::error::artifact $(basename "$f") is not version ${base}"; exit 1 ;;
+            esac
+          done
+          if [ "$n" -eq 0 ]; then
+            echo "::error::no artifacts were gathered; refusing to publish an empty release"
+            exit 1
+          fi
+          echo "OK: $n artifact(s), all version ${base}"
+
+      - name: Publish
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        shell: bash
         run: |
-            python -m twine upload dist/*.whl
-
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "::error::PYPI_API_TOKEN is not visible to this repository"
+            exit 1
+          fi
+          python3 -m pip install -U twine packaging
+          python3 -m twine check dist/*
+          # Idempotence net: one switch, two possible publishers, and a re-run
+          # of this job after a partial network failure -- a double-fire has to
+          # be a no-op rather than an error.
+          python3 -m twine upload --non-interactive --skip-existing dist/*
+          echo "published $(ls dist/ | wc -l) artifact(s)"
