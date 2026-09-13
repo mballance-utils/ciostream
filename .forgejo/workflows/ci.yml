@@ -1,0 +1,84 @@
+# mballance-utils/ciostream -- Forgejo Actions.
+#
+# THIS FILE'S FIRST JOB IS TO EXIST.
+#
+# When .forgejo/workflows/ is absent, the Forgejo runner FALLS BACK to running
+# .github/workflows/ -- measured on this instance, not assumed. Before
+# 2026-08-30 that meant this repo's GitHub publish steps were reachable from a
+# Forgejo runner that was never set up for them. The pair is not redundancy; it
+# is what stops that.
+#
+# WHY THIS IS A CHECK AND NOT A MIRROR OF THE GITHUB BUILD
+# --------------------------------------------------------
+# The GitHub workflow builds binary wheels across a Linux/macOS/Windows matrix,
+# in manylinux containers. The Forgejo runner here is a single
+# catthehacker/ubuntu:act-22.04 image with Python 3.10 and no third-party
+# actions, and cannot reproduce that. Writing a shadow that pretends to would
+# be worse than not having one: it would go red for reasons that are about the
+# runner rather than the code, and people would stop reading it.
+#
+# So this runs the checks that ARE meaningful here, and the release path stays
+# on GitHub.
+#
+# THERE IS DELIBERATELY NO PUBLISH JOB, and that is not the peakrdl-pss
+# anti-pattern. That pattern was wrong because sync-policy.toml claimed GitHub
+# was the release authority while only Forgejo could actually publish -- the
+# policy asserted something untrue. Here the policy says `github`, GitHub is
+# where the matrix build runs, and both are true.
+#
+# The consequence is worth stating: flipping [repo."mballance-utils/ciostream"]
+# to authority = "forgejo" would leave this repo with NO publisher at all. If
+# that flip is ever wanted, a real build must land here first.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for internal identifiers in tracked files
+      # This repo is published to git.dvkit.org, so anything committed here is
+      # public. Internal host names, tailnet addresses and CGNAT-range IPs must
+      # not appear in tracked files -- if a build ever needs one, it belongs in
+      # a repository secret, which is masked in logs.
+      run: |
+        pattern='perch-char\.ts\.net|\.ts\.net|a9550|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+'
+        if git grep -nIE "$pattern" -- . ':!.forgejo/workflows/ci.yml' ; then
+          echo "::error::internal identifier found in a tracked file (see matches above)"
+          exit 1
+        fi
+        echo "OK: no internal identifiers in tracked files"
+
+    - name: Static-check the packaging metadata
+      # Deliberately does NOT execute setup.py. Several of these projects
+      # declare setup_requires (setuptools_scm, cython, ivpm), so running it
+      # would pull dependencies over the network on every push -- turning a
+      # cheap guard into a slow, flaky, network-dependent one. A red build for
+      # reasons that are about the runner rather than the code is how people
+      # learn to ignore a signal.
+      #
+      # Parsing it catches the breakage that is actually worth catching here:
+      # a syntax error, and a version line that no longer matches the shape the
+      # release job's tag check greps for.
+      run: |
+        if [ -f setup.py ]; then
+          python3 -c "import ast,sys; ast.parse(open('setup.py').read()); print('setup.py parses')"
+          v=$(sed -n 's/^version="\(.*\)"$/\1/p' setup.py | head -1)
+          if [ -n "$v" ]; then
+            echo "declared version: $v"
+          else
+            echo "::warning::no top-level version=\"...\" in setup.py -- the release job's tag check greps for exactly that"
+          fi
+        elif [ -f pyproject.toml ]; then
+          python3 -c "import tomllib,sys; d=tomllib.load(open('pyproject.toml','rb')); print(d['project']['name'], d['project'].get('version'))"
+        else
+          echo "no setup.py or pyproject.toml; nothing to check"
+        fi
