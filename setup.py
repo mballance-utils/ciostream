@@ -3,7 +3,7 @@ from setuptools import setup
 from setuptools.extension import Extension
 from Cython.Build import cythonize
 
-version="0.0.1"
+version="0.0.2"
 
 # CI stamps a PEP 440 LOCAL VERSION SEGMENT onto everything that is not a tag
 # build, e.g. "dev33020374597+gh.g7775f37" -> 0.0.1.dev33020374597+gh.g7775f37.
