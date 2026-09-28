@@ -31,10 +31,17 @@
 # that flip is ever wanted, a real build must land here first.
 name: CI
 
+# NO TAG TRIGGER. This file publishes nothing, but git-sync's inbound preflight
+# treats ANY tag-triggered workflow as a release pipeline -- deliberately, it
+# does not trust itself to spot the publish step -- and reads the tree at the
+# tag's own commit. With a v* tag filter under push, every release tag made on
+# GitHub was refused entry to Forgejo ("tag-triggered release pipeline"). Do
+# not quote that filter's YAML key in this file either: the preflight is a
+# plain text match, so the words alone are enough to trip it.
+# Checking the pin on branch pushes is all this file needs to do.
 on:
   push:
     branches: ['**']
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
